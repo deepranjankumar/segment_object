@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="stylesheet" type="text/css" href="http://localhost:8000/style.css">
+    <title>Object Detection</title>
+</head>
+<style>
+    body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f2f2f2;
+}
+
+h1 {
+    text-align: center;
+    margin-top: 20px;
+}
+
+form {
+    text-align: center;
+    margin-bottom: 20px;
+}
+.btn {
+    background-color: rgb(24, 95, 227);
+    color: rgb(255, 255, 255);
+    border: none;
+    border-radius: .1rem;
+    width: 5rem;
+    height: 2rem;
+}
+.btn:hover{
+    box-shadow: 1px 2px 1px rgb(210, 203, 203);
+    cursor: pointer;
+}
+#result {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+
+#result img {
+    margin: 10px;
+    border: 2px solid #333;
+    border-radius: 5px;
+}
+
+#result-data div {
+    padding: 5px 10px;
+    background-color: #333;
+    color: #fff;
+    border-radius: 5px;
+    font-size: 14px;
+    font-weight: bold;
+    text-align: center;
+    width:  25%;
+    margin: auto;
+    margin-top: 0.5rem;
+}
+
+
+.start-line {
+    display: flex;
+    justify-content: center; /* Center the items horizontally */
+    /* align-items: center;  */
+    margin-bottom: 20px; /* Add some margin below */
+}
+
+.start-line label {
+    margin-right: 0.5rem; /* Add some spacing between the label and input */
+}
+
+.start-line input[type="number"] {
+    width: 4rem;
+    height: 2rem;
+    padding: 0.5rem;
+    border: 2px solid #333;
+    border-radius: 5px;
+}
+#boxIndexContainer{
+    margin-left:2rem;
+}
+.input-photo{
+    padding: 0.5rem;
+}
+</style>
+<body>
+    <h1>Count Similar Object and Detection</h1>
+    <div class= "start-line" >
+    <form class="input-photo" id="uploadForm" enctype="multipart/form-data">
+        <input type="file" name="file" id="fileInput">
+        <button class="btn" type="submit">Upload</button>
+        <!-- Add a number field for inputting box index -->
+       
+
+    </form>
+    <div id="boxIndexContainer">
+        <label for="boxIndex">Object number:</label>
+        <input type="number" id="boxIndex" name="boxIndex" min="0" value="0">
+    </div>
+    </div>
+    <div>
+        <div id="result"></div>
+        <div id="result-data"></div>
+    </div>  
+
+    
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var formData = new FormData();
+            formData.append('file', document.getElementById('fileInput').files[0]);
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                var resultDiv = document.getElementById('result');
+                var result_dataDiv = document.getElementById('result-data');
+
+                resultDiv.innerHTML = '';
+                result_dataDiv.innerHTML = '';
+
+                // Display uploaded image
+                var uploadedImage = document.createElement('img');
+                uploadedImage.src = URL.createObjectURL(document.getElementById('fileInput').files[0]);
+                uploadedImage.width = 500;
+                resultDiv.appendChild(uploadedImage);
+
+                // Display processed image
+                var processedImage = document.createElement('img');
+                processedImage.src = 'data:image/jpeg;base64,' + data.processed_image;
+                processedImage.width = 500;
+                resultDiv.appendChild(processedImage);
+
+                // Display object names and counts with buttons
+                for (var i = 0; i < data.objects.length; i++) {
+                    var object = data.objects[i];
+                    var objectDiv = document.createElement('div');
+                    var button = document.createElement('button');
+                    button.textContent = object.label + ': ' + object.count;
+                    
+                    button.onclick = function(label, boxes) {
+                        return function() {
+                            // Send a request to the server to generate segmented image
+                            var formData = new FormData();
+                            var index = document.getElementById('boxIndex').value;
+                            formData.append('image', document.getElementById('fileInput').files[0]);
+                            formData.append('box', JSON.stringify(boxes[index]));
+                            console.log(index)
+                            fetch('/segment', {
+                                method: 'POST',
+                                body: formData
+                            })
+                            .then(response => response.json())
+                            .then(data => {
+                                // Display segmented image
+                                var segmentedImage = document.createElement('img');
+                                segmentedImage.src = 'data:image/jpeg;base64,' + data.segmented_image;
+                                segmentedImage.width = 500;
+                                resultDiv.appendChild(segmentedImage);
+                            })
+                            .catch(error => console.error('Error:', error));
+                        };
+                    }(object.label, object.boxes); // Pass index 'i' as the box index
+                    objectDiv.appendChild(button);
+                    result_dataDiv.appendChild(objectDiv);
+                }
+
+            })
+            .catch(error => console.error('Error:', error));
+        });
+    </script>
+</body>
+</html>
